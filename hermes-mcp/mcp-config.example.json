@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "hermes": {
+      "command": "python3",
+      "args": ["/home/nicho/Code/Miia/hermes-mcp/server.py"],
+      "env": {
+        "HERMES_MANUAL_DB": "/home/nicho/Code/Miia/hermes-mcp/data/manual.db",
+        "HERMES_MANUAL_ROOT": "/home/nicho/Code/Miia/manual",
+        "HERMES_VEHICLE_STATE": "/var/run/hermes/vehicle_state.json"
+      }
+    }
+  }
+}
