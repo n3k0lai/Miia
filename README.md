@@ -1,136 +1,54 @@
 # Miia
 
-In-car Hermes assistant for a Mazda MX-5 ND: personality, factory service manual search, and CMU harness telemetry on a Raspberry Pi.
+In-car computer for a 2018 Mazda MX-5 ND Club. The board is a Jetson Orin Nano Super Developer Kit in the cluster void. The CMU stays in the dash. This repo is the NixOS host and the manual-search MCP. The Raspberry Pi shim plan is retired.
 
-## Overview
+The heavy conversation stays on ene. This board is a Tailscale node that can pull this repo and keep working once it is on the tailnet.
 
-Miia runs [Hermes Agent](https://github.com/NousResearch/hermes-agent) on a Pi shimmed into the **Connectivity Master Unit (CMU)** harness. The Pi keeps a checkout of this repo as Hermes’s workspace and uses an MCP server to search the bundled **Mazda AU service manual** (MX-5 ND, `d9m6-1a-21i_ver11`) without cloud embeddings—SQLite FTS5 on ~5,100 HTML pages.
+## What is on the board
 
-| Piece | Location |
-|-------|----------|
-| Hermes state | `/var/lib/hermes` |
-| Workspace (this repo) | `/var/lib/hermes/.hermes/workspace` |
-| Manual index DB | `hermes-mcp/data/manual.db` |
-| Vehicle telemetry | `/var/run/hermes/vehicle_state.json` (harness daemon) |
-| NixOS host config | [`dotfiles/hosts/miia.nix`](../../dotfiles/hosts/miia.nix) |
+NixOS 26.05, aarch64, JetPack 6, `som = "orin-nano"`, `super = true`. Tailscale hostname `miia`. Hermes CLI from `NousResearch/hermes-agent` at `v2026.9.24`. The Hermes gateway is not started. It does not share ene's Discord session, and it does not get a model key from this repo.
 
-Nix wiring lives in **dotfiles** (Hermes module, manual MCP, `miia` host); this flake builds the MCP binaries.
+Root disk is the 256 GB 2280 NVMe in the Key-M x4 slot. Screw that in before the first boot. Do not install onto the microSD.
 
-## Architecture
+Firmware flash still comes from kiss, which is x86_64. The flash package is `github:anduril/jetpack-nixos#flash-orin-nano-super-devkit`. This repo does not vendor that script.
 
-```
-Hermes (gateway) ──stdio──► hermes-mcp
-                                ├── SQLite FTS (manual.db)
-                                ├── manual/ (HTML)
-                                └── vehicle_state.json (CMU harness)
-```
+## Desk install
 
-Hermes tools are prefixed `mcp_mx5_manual_*` (e.g. `mcp_mx5_manual_lookup_dtc`, `mcp_mx5_manual_search_manual`).
+Seat the NVMe. Hold recovery, tap reset, and confirm `lsusb` shows `0955:7023`.
 
-## MCP tools
-
-| Tool | Purpose |
-|------|---------|
-| `search_manual` | Full-text search procedures, wiring, components |
-| `get_manual_page` | Full page text by `page_id` or path |
-| `lookup_dtc` | Pages for a DTC (e.g. `B108E:87`) |
-| `list_manual_sections` | `srvc` / `engine` / `mission` / `srt` counts |
-| `get_vehicle_state` | Live JSON from the harness shim |
-
-Resources: `hermes://context`, `hermes://manual/stats`.
-
-## Nix
-
-### This flake (`Miia`)
+On kiss, build and run the firmware flash:
 
 ```bash
-nix build .#hermes-mcp      # MCP server binary
-nix build .#hermes-index-manual
+nix build github:anduril/jetpack-nixos#flash-orin-nano-super-devkit
+sudo ./result/bin/flash-orin-nano-super-devkit
 ```
 
-Packages: `hermes-mcp`, `hermes-index-manual`. Module: `nixosModules.hermes-miia` (rebuilds the manual index on activation when `manual/` is newer than the DB).
-
-### Dotfiles host `miia`
-
-The Pi is **`aarch64-linux`** in [`dotfiles/flake.nix`](../../dotfiles/flake.nix):
-
-- Imports [`modules/servers/hermes.nix`](../../dotfiles/modules/servers/hermes.nix) (same pattern as [`ene.nix`](../../dotfiles/hosts/ene.nix))
-- [`modules/servers/hermes-manual-mcp.nix`](../../dotfiles/modules/servers/hermes-manual-mcp.nix) — registers `mx5_manual` via `services.hermes-agent.mcpServers`
-- [`hosts/miia.nix`](../../dotfiles/hosts/miia.nix) — workspace path, SOUL.md, browser/delegation off for in-car use
-
-Deploy:
+Then build the installer ISO and write it to a USB stick, not to the NVMe:
 
 ```bash
-cd ~/Code/dotfiles
-sudo nixos-rebuild switch --flake .#miia --target-host root@miia
+nix build github:anduril/jetpack-nixos#iso_minimal
 ```
 
-### Workspace on the Pi
+Boot that stick from the UEFI menu. Partition the NVMe with labels `BOOT` (vfat, the ESP) and `nixos` (ext4). Install with:
 
 ```bash
-sudo mkdir -p /var/lib/hermes/.hermes
-sudo git clone <this-repo> /var/lib/hermes/.hermes/workspace
-sudo chown -R hermes:users /var/lib/hermes
+sudo nixos-install --flake github:n3k0lai/Miia#miia
 ```
 
-Ensure `manual/` is present in the workspace; the activation script builds `hermes-mcp/data/manual.db` on first boot or after manual updates.
-
-### Local model
-
-Default in `miia.nix` follows ene (`xai-oauth`). Override in gitignored **`hosts/miia-local.nix`** on dotfiles, e.g. OpenAI-compatible local endpoint:
-
-```nix
-{ ... }: {
-  services.hermes-agent.settings.model = {
-    provider = "openai";
-    default = "your-model";
-    base_url = "http://127.0.0.1:11434/v1";
-  };
-}
-```
-
-Secrets: `modules/servers/secrets/hermes_env.age` (agenix), or a Pi-specific secret in `miia-local.nix`.
-
-### Hardware
-
-Edit [`dotfiles/hosts/miia-hardware.nix`](../../dotfiles/hosts/miia-hardware.nix) and optional **`miia-local.nix`** for your Pi model, disk, and SSH keys.
-
-## CMU harness telemetry
-
-The harness daemon should write JSON to `/var/run/hermes/vehicle_state.json`:
-
-```json
-{
-  "timestamp": "2026-06-02T12:00:00Z",
-  "ignition": "ON",
-  "dtcs": ["B108E:87"],
-  "pids": { "0C": 850, "05": 92 }
-}
-```
-
-Hermes uses `get_vehicle_state` and should call `lookup_dtc` for each active code.
-
-## Development (non-Nix)
+Reboot from the NVMe. On the board:
 
 ```bash
-cd hermes-mcp
-./install.sh    # venv + index build
+sudo tailscale up --ssh --hostname=miia
 ```
 
-MCP client example: `hermes-mcp/mcp-config.example.json`.
+From ene, once `miia` shows on the tailnet, SSH as `nicho` and continue. The workspace clone lands at `/var/lib/hermes/.hermes/workspace` after the network is up. `hermes` is on `PATH` after that install. Turning the gateway on is a later switch, after a key exists outside this repo.
 
-Rebuild index after manual changes:
+## MCP
 
-```bash
-hermes-mcp/.venv/bin/python hermes-mcp/index_manual.py --rebuild
-```
+`nix build .#hermes-mcp` still builds the manual search server. The HTML manual is not in this repo. The index is built on the board when `manual/` is present. Module: `nixosModules.hermes-miia`.
 
-## Manual
+Tools stay `search_manual`, `get_manual_page`, `lookup_dtc`, `list_manual_sections`, and `get_vehicle_state`. The harness JSON path is still `/var/run/hermes/vehicle_state.json`. That daemon is not part of the first boot.
 
-`manual/` is the Mazda ESI export (~273 MB, ~5k HTML pages). Indexed content is plain text with cautions/notes preserved; DTC codes are extracted for fast lookup.
+## What this host is not
 
-## Still to do
-
-- Pi-specific `miia-hardware.nix` / `miia-local.nix` on the device
-- Harness daemon (systemd unit + CAN/socket reader) writing `vehicle_state.json`
-- Local inference backend choice on the Pi (Ollama, etc.) in `miia-local.nix`
+It does not import the ene Hermes module. It does not open a second Discord bot. It does not fetch mazdatweaks.com. UART to the CMU is a later harness job, not part of the first boot.

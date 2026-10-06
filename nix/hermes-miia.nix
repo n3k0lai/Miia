@@ -11,7 +11,7 @@ in
     workspace = lib.mkOption {
       type = lib.types.str;
       default = "/var/lib/hermes/.hermes/workspace";
-      description = "Miia git checkout (Hermes working directory on the Pi)";
+      description = "Miia git checkout (Hermes working directory on the Jetson)";
     };
     vehicleStateFile = lib.mkOption {
       type = lib.types.str;
