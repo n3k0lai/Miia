@@ -2,7 +2,7 @@
 
 In-car computer for a 2018 Mazda MX-5 ND Club. The board is a Jetson Orin Nano Super Developer Kit in the cluster void. The CMU stays in the dash. This repo is the NixOS host and the manual-search MCP. The Raspberry Pi shim plan is retired.
 
-The heavy conversation stays on ene. This board is a Tailscale node that can pull this repo and keep working once it is on the tailnet.
+The heavy conversation stays on ene. This board is a Tailscale node that can pull this repo and keep working once it is on the tailnet. Its identity is `n3k0lai/soul` branch `miia` at `ac99aa21f3f8db1c5d14340b4f578d794608e379`. That repo is private, so the desk install carries the same files under `soul/` and writes them to `/var/lib/hermes/.hermes` on first boot. When the board has a key that can read the private repo, that seed is replaced by a checkout of branch `miia`.
 
 ## What is on the board
 

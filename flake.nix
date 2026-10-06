@@ -32,6 +32,7 @@
         modules = [
           jetpack.nixosModules.default
           ./hosts/miia.nix
+          ./nix/soul-miia.nix
           {
             nixpkgs.config = {
               allowUnfree = true;
