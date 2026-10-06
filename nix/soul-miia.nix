@@ -2,7 +2,7 @@
 # n3k0lai/soul branch miia when a key can read that private repo.
 { lib, pkgs, ... }:
 let
-  soulRev = "ac99aa21f3f8db1c5d14340b4f578d794608e379";
+  soulRev = "36ab6cb44fd72a26c4fec4102dce3f96160a98b8";
   seed = ../soul;
 in
 {
