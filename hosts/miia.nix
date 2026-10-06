@@ -17,6 +17,32 @@
   };
   hardware.graphics.enable = true;
 
+  # Clicks Power Keyboard is BLE 5.4. The kit radio is the Key-E card.
+  # Pairing is per adapter: kiss is channel 9, rook is 3, the phone keeps 1.
+  hardware.enableRedistributableFirmware = true;
+  hardware.bluetooth = {
+    enable = true;
+    powerOnBoot = true;
+    settings = {
+      General = {
+        Experimental = true;
+        ControllerMode = "dual";
+        FastConnectable = true;
+        JustWorksRepairing = "always";
+        Privacy = "off";
+      };
+      Policy = {
+        AutoEnable = true;
+      };
+    };
+    input = {
+      General = {
+        ClassicBondedOnly = false;
+        UserspaceHID = true;
+      };
+    };
+  };
+
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
   boot.initrd.availableKernelModules = [ "nvme" "usbhid" "usb_storage" "sd_mod" ];
@@ -67,6 +93,7 @@
   environment.systemPackages = [
     pkgs.git
     pkgs.vim
+    pkgs.bluez
     hermes-agent.packages.aarch64-linux.default
   ];
 
